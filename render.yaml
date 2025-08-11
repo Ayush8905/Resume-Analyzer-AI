@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: ai-resume-optimizer
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: false
+      - key: GEMINI_API_KEY
+        sync: false  # This will be set manually in Render dashboard
