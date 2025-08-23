@@ -10,10 +10,25 @@
 </head>
 
 <body>
+    <!-- Floating Animation Elements -->
+    <div class="floating-elements">
+        <div class="floating-icon" style="top: 10%; left: 10%; animation-delay: 0s;">💼</div>
+        <div class="floating-icon" style="top: 20%; right: 15%; animation-delay: 2s;">📄</div>
+        <div class="floating-icon" style="top: 60%; left: 5%; animation-delay: 4s;">🤖</div>
+        <div class="floating-icon" style="bottom: 20%; right: 10%; animation-delay: 6s;">⭐</div>
+        <div class="floating-icon" style="bottom: 40%; left: 20%; animation-delay: 8s;">🚀</div>
+    </div>
+
     <div class="container">
         <header>
-            <h1><i class="fas fa-robot"></i> AI Resume Optimizer</h1>
-            <p>Upload your resume and job description to get an AI-optimized, ATS-friendly version</p>
+            <h1><i class="fas fa-robot animated-robot"></i> AI Resume Optimizer</h1>
+            <p class="subtitle-animated">Upload your resume and job description to get an AI-optimized, ATS-friendly
+                version</p>
+            <div class="header-decoration">
+                <div class="decoration-line"></div>
+                <div class="decoration-dot"></div>
+                <div class="decoration-line"></div>
+            </div>
         </header>
 
         <div class="main-content">
@@ -42,8 +57,18 @@
             </div>
 
             <div id="loadingSection" class="loading-section" style="display: none;">
-                <div class="spinner"></div>
-                <p>AI is optimizing your resume... This may take a few moments.</p>
+                <div class="loading-animation">
+                    <div class="spinner"></div>
+                    <div class="loading-dots">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                </div>
+                <p class="loading-text">AI is optimizing your resume... This may take a few moments.</p>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
             </div>
 
             <div id="resultsSection" class="results-section" style="display: none;">

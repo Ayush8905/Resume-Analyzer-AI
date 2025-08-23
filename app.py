@@ -5,13 +5,9 @@ from werkzeug.utils import secure_filename
 import pdfplumber
 import docx
 from docx import Document
-from docx.shared import Inches
 import google.generativeai as genai
 from dotenv import load_dotenv
-import tempfile
 import uuid
-import threading
-import time
 
 # Load environment variables
 load_dotenv()
@@ -23,38 +19,21 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 # Create uploads directory if it doesn't exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Validate and configure Gemini API
+# Configure Gemini API
 api_key = os.getenv('GEMINI_API_KEY')
 if not api_key or api_key == 'your_gemini_api_key_here':
     print("ERROR: Please set a valid GEMINI_API_KEY in your .env file")
     print("Get your API key from: https://makersuite.google.com/app/apikey")
     exit(1)
 
-genai.configure(api_key=api_key)
+try:
+    genai.configure(api_key=api_key)
+    print("✅ Gemini API configured successfully!")
+except Exception as e:
+    print(f"❌ Error configuring Gemini API: {e}")
+    exit(1)
 
 ALLOWED_EXTENSIONS = {'txt', 'pdf', 'docx'}
-
-def cleanup_old_files():
-    """Clean up files older than 1 hour"""
-    try:
-        current_time = time.time()
-        for filename in os.listdir(app.config['UPLOAD_FOLDER']):
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            if os.path.isfile(file_path):
-                file_age = current_time - os.path.getctime(file_path)
-                if file_age > 3600:  # 1 hour
-                    os.remove(file_path)
-                    print(f"Cleaned up old file: {filename}")
-    except Exception as e:
-        print(f"Error during cleanup: {e}")
-
-def schedule_cleanup():
-    """Schedule periodic cleanup"""
-    cleanup_old_files()
-    threading.Timer(1800, schedule_cleanup).start()  # Run every 30 minutes
-
-# Start cleanup scheduler
-schedule_cleanup()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -107,6 +86,7 @@ def extract_text_from_file(file_path, filename):
 def optimize_resume_with_gemini(resume_text, job_description):
     """Use Gemini API to optimize resume"""
     try:
+        print("🤖 Calling Gemini API...")
         model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
@@ -142,6 +122,7 @@ def optimize_resume_with_gemini(resume_text, job_description):
         """
         
         response = model.generate_content(prompt)
+        print("✅ Gemini API response received!")
         
         if not response or not response.text:
             raise Exception("Empty response from Gemini API")
@@ -165,7 +146,7 @@ def optimize_resume_with_gemini(resume_text, job_description):
             
             return result
         except json.JSONDecodeError as e:
-            print(f"JSON parsing error: {e}")
+            print(f"⚠️ JSON parsing error: {e}")
             # If JSON parsing fails, return a structured response
             return {
                 "optimized_resume": response.text,
@@ -175,30 +156,36 @@ def optimize_resume_with_gemini(resume_text, job_description):
             }
             
     except Exception as e:
+        print(f"❌ Gemini API error: {e}")
         raise Exception(f"Error with Gemini API: {str(e)}")
 
 def create_docx_from_text(text, filename):
     """Create a DOCX file from text"""
-    doc = Document()
-    
-    # Add title
-    title = doc.add_heading('Optimized Resume', 0)
-    title.alignment = 1  # Center alignment
-    
-    # Split text into paragraphs and add to document
-    paragraphs = text.split('\n')
-    for para_text in paragraphs:
-        if para_text.strip():
-            if para_text.isupper() or para_text.endswith(':'):
-                # Likely a section header
-                doc.add_heading(para_text, level=1)
-            else:
-                doc.add_paragraph(para_text)
-    
-    # Save to temporary file
-    temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    doc.save(temp_path)
-    return temp_path
+    try:
+        doc = Document()
+        
+        # Add title
+        title = doc.add_heading('Optimized Resume', 0)
+        title.alignment = 1  # Center alignment
+        
+        # Split text into paragraphs and add to document
+        paragraphs = text.split('\n')
+        for para_text in paragraphs:
+            if para_text.strip():
+                if para_text.isupper() or para_text.endswith(':'):
+                    # Likely a section header
+                    doc.add_heading(para_text, level=1)
+                else:
+                    doc.add_paragraph(para_text)
+        
+        # Save to temporary file
+        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        doc.save(temp_path)
+        print(f"✅ DOCX file created: {filename}")
+        return temp_path
+    except Exception as e:
+        print(f"❌ Error creating DOCX: {e}")
+        raise Exception(f"Error creating DOCX file: {str(e)}")
 
 @app.route('/')
 def index():
@@ -207,6 +194,8 @@ def index():
 @app.route('/optimize', methods=['POST'])
 def optimize_resume():
     try:
+        print("📄 Processing resume optimization request...")
+        
         # Check if file was uploaded
         if 'resume' not in request.files:
             return jsonify({'error': 'No resume file uploaded'}), 400
@@ -228,13 +217,17 @@ def optimize_resume():
         unique_filename = f"{uuid.uuid4()}_{filename}"
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
         file.save(file_path)
+        print(f"📁 File saved: {unique_filename}")
         
         try:
             # Extract text from uploaded file
+            print("📖 Extracting text from file...")
             resume_text = extract_text_from_file(file_path, filename)
             
             if not resume_text.strip():
                 return jsonify({'error': 'Could not extract text from the uploaded file'}), 400
+            
+            print(f"✅ Text extracted successfully ({len(resume_text)} characters)")
             
             # Optimize resume using Gemini
             optimization_result = optimize_resume_with_gemini(resume_text, job_description)
@@ -245,6 +238,8 @@ def optimize_resume():
                 optimization_result['optimized_resume'], 
                 optimized_filename
             )
+            
+            print("🎉 Resume optimization completed successfully!")
             
             return jsonify({
                 'success': True,
@@ -259,8 +254,10 @@ def optimize_resume():
             # Clean up uploaded file
             if os.path.exists(file_path):
                 os.remove(file_path)
+                print(f"🗑️ Cleaned up uploaded file: {unique_filename}")
                 
     except Exception as e:
+        print(f"❌ Error in optimize_resume: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/download/<filename>')
@@ -268,12 +265,15 @@ def download_file(filename):
     try:
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         if os.path.exists(file_path):
-            return send_file(file_path, as_attachment=True, download_name=f"optimized_resume.docx")
+            print(f"📥 Serving download: {filename}")
+            return send_file(file_path, as_attachment=True, download_name="optimized_resume.docx")
         else:
             return jsonify({'error': 'File not found'}), 404
     except Exception as e:
+        print(f"❌ Download error: {e}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(debug=os.getenv('FLASK_DEBUG', 'False').lower() == 'true', host='0.0.0.0', port=port)
+    print("🚀 Starting AI Resume Optimizer...")
+    print("🌐 Server will be available at: http://localhost:5000")
+    app.run(debug=True, host='127.0.0.1', port=5000)
