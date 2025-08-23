@@ -41,11 +41,17 @@ document.addEventListener('DOMContentLoaded', function () {
         showLoading();
 
         try {
+            // Add timeout for faster user feedback
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
             const response = await fetch('/optimize', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
 
+            clearTimeout(timeoutId);
             const data = await response.json();
 
             if (data.success) {
@@ -54,8 +60,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 showError(data.error || 'An error occurred while optimizing your resume.');
             }
         } catch (error) {
-            console.error('Error:', error);
-            showError('Network error. Please check your connection and try again.');
+            if (error.name === 'AbortError') {
+                showError('Request timed out. Please try again with a shorter resume or job description.');
+            } else {
+                console.error('Error:', error);
+                showError('Network error. Please check your connection and try again.');
+            }
         }
     });
 
@@ -65,9 +75,36 @@ document.addEventListener('DOMContentLoaded', function () {
         errorSection.style.display = 'none';
         loadingSection.style.display = 'block';
         optimizeBtn.disabled = true;
+
+        // Dynamic loading messages for better UX
+        const loadingMessages = [
+            "AI is analyzing your resume...",
+            "Extracting key information...",
+            "Matching with job requirements...",
+            "Optimizing keywords and format...",
+            "Finalizing your enhanced resume..."
+        ];
+
+        let messageIndex = 0;
+        const loadingText = document.getElementById('loadingText');
+
+        const messageInterval = setInterval(() => {
+            if (messageIndex < loadingMessages.length - 1) {
+                messageIndex++;
+                loadingText.textContent = loadingMessages[messageIndex];
+            }
+        }, 2000);
+
+        // Store interval ID to clear it later
+        window.loadingMessageInterval = messageInterval;
     }
 
     function showResults(data) {
+        // Clear loading message interval
+        if (window.loadingMessageInterval) {
+            clearInterval(window.loadingMessageInterval);
+        }
+
         loadingSection.style.display = 'none';
         errorSection.style.display = 'none';
         resultsSection.style.display = 'block';
@@ -75,11 +112,11 @@ document.addEventListener('DOMContentLoaded', function () {
         // Add success animation
         createSuccessAnimation();
 
-        // Animate ATS score counting up
-        animateCounter(document.getElementById('atsScore'), 0, parseInt(data.ats_score), 2000);
+        // Animate ATS score counting up (faster)
+        animateCounter(document.getElementById('atsScore'), 0, parseInt(data.ats_score), 1000);
 
-        // Typewriter effect for optimized content
-        typewriterEffect(document.getElementById('optimizedContent'), data.optimized_resume, 50);
+        // Much faster typewriter effect for optimized content
+        typewriterEffect(document.getElementById('optimizedContent'), data.optimized_resume, 5);
 
         // Populate changes
         const changesContent = document.getElementById('changesContent');
@@ -236,8 +273,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 });
-// Enhanc
-ed Animation Functions
+
+// Enhanced Animation Functions
 function shakeElement(element) {
     element.style.animation = 'shake 0.5s ease-in-out';
     setTimeout(() => {
