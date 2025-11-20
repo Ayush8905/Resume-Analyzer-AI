@@ -1,4 +1,5 @@
 # 🤖 AI Resume Optimizer & Generator
+## Live Demo Link: https://resume-optimizer-ai.vercel.app/
 
 A beautiful, AI-powered web application that optimizes resumes based on job descriptions using Google's Gemini API. Built with modern animations and responsive design.
 
